@@ -166,6 +166,41 @@ function brandPreference(product: Product, preferredBrands: string[]): boolean {
   });
 }
 
+function compareRanked(a: RankedProduct, b: RankedProduct): number {
+  const aCost = a.estimatedTotalCost;
+  const bCost = b.estimatedTotalCost;
+  const similarRelevance = Math.abs(a.relevance - b.relevance) <= 0.1;
+  const similarOverbuy =
+    Math.abs((a.overbuyRatio ?? 0) - (b.overbuyRatio ?? 0)) <= 0.05;
+
+  // Guardrail for the common grocery case: if two options match the request
+  // equally well and require essentially the same amount of overbuy, the cheaper
+  // basket cost must win. This prevents tiny relevance-score differences from
+  // putting a more expensive equivalent pack ahead of a cheaper one.
+  if (
+    aCost !== undefined &&
+    bCost !== undefined &&
+    similarRelevance &&
+    similarOverbuy &&
+    Math.abs(aCost - bCost) > 0.001
+  ) {
+    return aCost - bCost;
+  }
+
+  const scoreDiff = a.score - b.score;
+  if (Math.abs(scoreDiff) > 1e-9) return scoreDiff;
+
+  if (aCost !== undefined && bCost !== undefined && aCost !== bCost) {
+    return aCost - bCost;
+  }
+
+  if (a.product.price !== b.product.price) {
+    return a.product.price - b.product.price;
+  }
+
+  return a.product.label.localeCompare(b.product.label, "fr");
+}
+
 export function rankProducts(
   products: Product[],
   options: ProductRankingOptions,
@@ -261,7 +296,7 @@ export function rankProducts(
           reasons,
         };
       })
-      .sort((a, b) => a.score - b.score)
+      .sort(compareRanked)
       .slice(0, limit);
   }
 
@@ -309,6 +344,6 @@ export function rankProducts(
         reasons,
       };
     })
-    .sort((a, b) => a.score - b.score)
+    .sort(compareRanked)
     .slice(0, limit);
 }
