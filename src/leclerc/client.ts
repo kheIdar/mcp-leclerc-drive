@@ -306,12 +306,31 @@ function mapProduct(rp: RawProduct): Product {
   const label = decodeEntities(
     [rp.sLibelleLigne1, rp.sLibelleLigne2].filter(Boolean).join(" ").trim(),
   );
-  const price = num(rp.nrPVUnitaireTTC) ?? parseEuro(rp.sPrixUnitaire) ?? 0;
+  const regularPrice = num(rp.nrPVUnitaireTTC) ?? parseEuro(rp.sPrixUnitaire) ?? 0;
+  const rawPromoPrice = parseEuro(rp.sPrixPromo);
+  const promoPrice =
+    rawPromoPrice !== undefined &&
+    rawPromoPrice > 0 &&
+    (regularPrice <= 0 || rawPromoPrice < regularPrice)
+      ? rawPromoPrice
+      : undefined;
+  const price = promoPrice ?? regularPrice;
+
+  const regularPricePerUnit =
+    num(rp.nrPVParUniteDeMesureTTC) ?? parseEuro(rp.sPrixParUniteDeMesure);
+  const pricePerUnitValue =
+    regularPricePerUnit && promoPrice && regularPrice > 0
+      ? round2(regularPricePerUnit * (promoPrice / regularPrice))
+      : regularPricePerUnit;
+
   return {
     id: String(rp.iIdProduit),
     label: label || `Produit ${rp.iIdProduit}`,
     price,
+    regularPrice: promoPrice ? regularPrice : undefined,
+    promoPrice,
     pricePerUnit: rp.sPrixParUniteDeMesure || undefined,
+    pricePerUnitValue,
     available: (num(rp.iQteDisponible) ?? 0) > 0,
     imageUrl: rp.sUrlVignetteProduit || undefined,
   };
