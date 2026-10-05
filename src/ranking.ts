@@ -2,6 +2,7 @@ import { Product } from "./types.js";
 
 export type RankingStrategy = "balanced" | "cheapest" | "unit_price";
 export type NeedUnit = "g" | "kg" | "ml" | "l" | "unit";
+type MeasureUnit = NeedUnit | "cl";
 
 export interface ProductRankingOptions {
   query: string;
@@ -78,7 +79,14 @@ function parseNumber(raw: string): number {
 }
 
 function packageMeasure(label: string): PackageMeasure | undefined {
-  const normalized = normalizeText(label);
+  // Keep decimal separators for formats such as "1,5 L"; normalizeText() would
+  // replace them with spaces and make quantity detection unreliable.
+  const normalized = label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 
   const multi = normalized.match(
     /\b(\d+)\s*x\s*(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml)\b/i,
@@ -86,7 +94,7 @@ function packageMeasure(label: string): PackageMeasure | undefined {
   if (multi) {
     const count = Number(multi[1]);
     const value = parseNumber(multi[2]);
-    const converted = convertMeasure(value, multi[3].toLowerCase() as NeedUnit);
+    const converted = convertMeasure(value, multi[3].toLowerCase() as MeasureUnit);
     if (converted) return { kind: converted.kind, amount: converted.amount * count };
   }
 
@@ -95,7 +103,7 @@ function packageMeasure(label: string): PackageMeasure | undefined {
   ];
   if (measures.length > 0) {
     const match = measures[measures.length - 1];
-    return convertMeasure(parseNumber(match[1]), match[2].toLowerCase() as NeedUnit);
+    return convertMeasure(parseNumber(match[1]), match[2].toLowerCase() as MeasureUnit);
   }
 
   const countMatch = normalized.match(
@@ -108,7 +116,7 @@ function packageMeasure(label: string): PackageMeasure | undefined {
   return undefined;
 }
 
-function convertMeasure(value: number, unit: NeedUnit): PackageMeasure | undefined {
+function convertMeasure(value: number, unit: MeasureUnit): PackageMeasure | undefined {
   switch (unit) {
     case "kg":
       return { kind: "mass", amount: value * 1000 };
@@ -116,6 +124,8 @@ function convertMeasure(value: number, unit: NeedUnit): PackageMeasure | undefin
       return { kind: "mass", amount: value };
     case "l":
       return { kind: "volume", amount: value * 1000 };
+    case "cl":
+      return { kind: "volume", amount: value * 10 };
     case "ml":
       return { kind: "volume", amount: value };
     case "unit":
