@@ -13,10 +13,16 @@ export interface Product {
   label: string;
   /** Brand, e.g. "Marque Repère". Optional — not always present. */
   brand?: string;
-  /** Unit price in euros, e.g. 1.29. */
+  /** Effective unit price in euros (promotion applied when available). */
   price: number;
+  /** Regular shelf price before promotion, when different from price. */
+  regularPrice?: number;
+  /** Promotional unit price, when the catalogue exposes one. */
+  promoPrice?: number;
   /** Price per kilo / litre when the site exposes it, e.g. "1,29 €/L". */
   pricePerUnit?: string;
+  /** Numeric counterpart of pricePerUnit, used for deterministic ranking. */
+  pricePerUnitValue?: number;
   /** Nutri-Score letter A–E, when available. */
   nutriScore?: string;
   /** Whether the item is currently orderable in the selected store. */
