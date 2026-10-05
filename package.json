@@ -2,7 +2,7 @@
   "name": "mcp-leclerc-drive",
   "version": "0.3.0",
   "mcpName": "io.github.skunkobi/leclerc-drive",
-  "description": "MCP server for E.Leclerc Drive — search products, manage cart, and order groceries from Claude",
+  "description": "MCP server for E.Leclerc Drive — search products, rank smart choices, and manage a grocery cart",
   "type": "module",
   "bin": {
     "mcp-leclerc-drive": "dist/index.js"
@@ -17,7 +17,8 @@
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
     "smoke": "node scripts/smoke-test.mjs",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:ranking": "npm run build && node scripts/ranking-smoke.mjs"
   },
   "keywords": [
     "mcp",
@@ -31,7 +32,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/skunkobi/mcp-leclerc-drive.git"
+    "url": "git+https://github.com/kheIdar/mcp-leclerc-drive.git"
   },
   "engines": {
     "node": ">=22"
