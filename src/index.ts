@@ -168,12 +168,8 @@ server.tool(
 
       const lines = ranked.map((entry, index) => {
         const prefix = index === 0 ? "★ MEILLEUR CHOIX" : `${index + 1}.`;
-        const estimate =
-          entry.packages && entry.estimatedTotalCost !== undefined
-            ? ` | ${entry.packages} paquet(s), coût estimé ${entry.estimatedTotalCost.toFixed(2)} €`
-            : "";
         const why = entry.reasons.length > 0 ? ` | ${entry.reasons.join(", ")}` : "";
-        return `${prefix} ${formatProduct(entry.product)}${estimate}${why}`;
+        return `${prefix} ${formatProduct(entry.product)}${why}`;
       });
 
       return asText(
