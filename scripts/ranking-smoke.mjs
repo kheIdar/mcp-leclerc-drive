@@ -51,6 +51,39 @@ assert.equal(
 );
 assert.equal(forTwoLitres[0]?.packages, 2);
 
+const equivalentPacks = rankProducts(
+  [
+    {
+      id: "milk-105",
+      label: "Lait demi-écrémé 1 L",
+      price: 1.05,
+      pricePerUnit: "1,05 €/L",
+      pricePerUnitValue: 1.05,
+      available: true,
+    },
+    {
+      id: "milk-099",
+      label: "Lait demi-écrémé UHT 1 L",
+      price: 0.99,
+      pricePerUnit: "0,99 €/L",
+      pricePerUnitValue: 0.99,
+      available: true,
+    },
+  ],
+  {
+    query: "lait demi-écrémé",
+    neededAmount: 2,
+    neededUnit: "l",
+    strategy: "balanced",
+  },
+);
+
+assert.equal(
+  equivalentPacks[0]?.product.id,
+  "milk-099",
+  "equivalent formats should be ordered by the cheaper basket cost",
+);
+
 const bestUnitPrice = rankProducts(products, {
   query: "lait demi-écrémé",
   strategy: "unit_price",
