@@ -18,6 +18,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { platform } from "node:os";
 
 export interface PageResponse {
@@ -39,10 +40,17 @@ export interface ChromeOptions {
   headless: boolean;
 }
 
-const DEFAULT_CHROME: Record<string, string> = {
-  darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  linux: "google-chrome",
-  win32: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+const DEFAULT_CHROMIUM_CANDIDATES: Record<string, string[]> = {
+  darwin: [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  ],
+  linux: ["google-chrome", "microsoft-edge", "chromium", "chromium-browser"],
+  win32: [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+  ],
 };
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -70,7 +78,16 @@ export class ChromeSession {
   constructor(private readonly opts: ChromeOptions) {}
 
   private chromeBinary(): string {
-    return this.opts.chromePath || DEFAULT_CHROME[platform()] || "google-chrome";
+    if (this.opts.chromePath) return this.opts.chromePath;
+
+    const candidates = DEFAULT_CHROMIUM_CANDIDATES[platform()] ?? ["google-chrome"];
+    for (const candidate of candidates) {
+      // Absolute paths can be checked directly. Command names on Linux are left
+      // to PATH resolution by spawn().
+      if (!candidate.startsWith("/") || existsSync(candidate)) return candidate;
+    }
+
+    return candidates[0];
   }
 
   private async ensureLaunched(): Promise<void> {

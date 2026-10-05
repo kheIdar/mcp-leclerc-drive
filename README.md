@@ -1,6 +1,6 @@
 # mcp-leclerc-drive
 
-> The first open-source **MCP server for E.Leclerc Drive** — let Claude search products, manage a cart, and prepare grocery orders natively, instead of clicking through the website.
+> An open-source **MCP server for E.Leclerc Drive** — let an MCP-capable assistant search products, compare value, manage a cart, and prepare grocery orders natively instead of clicking through the website.
 
 > 🟢 **v0.3 — working & DataDome-proof.** All eight tools are validated end-to-end against the live site. Requests run inside a **real Chrome driven over CDP**, so they pass DataDome's bot protection (which blocks headless clients and cookie-replay). You log into Leclerc Drive once in the window that opens; the session persists. See [`docs/api-capture.md`](docs/api-capture.md) for the reverse-engineered API.
 
@@ -16,10 +16,32 @@ E.Leclerc Drive has no public API. Today the only way to automate it is browser 
 | `set_store(store_id)` | Select & remember the active store (resolves the right host automatically). |
 | `get_store()` | Show the currently selected store. |
 | `search_product(query)` | Search the catalogue → products with price, price/kg, Nutri-Score, availability, and an `id`. |
+| `search_best_product(...)` | Rank matching products by relevance, effective price, price/kg or L, promotions, requested quantity/format, and optional preferred brands. |
 | `add_to_cart(product_id, quantity?)` | Add a product to the cart. |
 | `remove_from_cart(product_id)` | Remove a line from the cart. |
 | `update_quantity(product_id, quantity)` | Set a line's quantity (0 removes it). |
 | `get_cart()` | Read the full cart with total. |
+
+## Smart product selection in this fork
+
+This fork adds a deterministic `search_best_product` tool so an assistant does
+**not** blindly add the first Leclerc search result.
+
+The default `balanced` strategy:
+
+- filters out unavailable and weakly matching products;
+- uses promotional prices when they are genuinely lower than the regular price;
+- compares both total ticket price and price per kg/L when available;
+- can use a requested quantity such as `2 L` or `750 g` to estimate how many
+  packs are needed and penalize unnecessary overbuying;
+- can mildly favor preferred brands without allowing a large price gap to be
+  ignored.
+
+Two explicit alternatives are available: `cheapest` (minimize checkout cost)
+and `unit_price` (prioritize price per kg/L).
+
+The ranking tool only recommends products. Cart mutation still goes through
+`add_to_cart`, which keeps selection and write actions separate and auditable.
 
 ## Status
 
@@ -38,10 +60,12 @@ E.Leclerc Drive has no public API. Today the only way to automate it is browser 
 ## Install (development)
 
 ```bash
-git clone https://github.com/skunkobi/mcp-leclerc-drive.git
+git clone https://github.com/kheIdar/mcp-leclerc-drive.git
 cd mcp-leclerc-drive
+git checkout feature/smart-product-selection
 npm install
 npm run build
+npm run test:ranking
 ```
 
 ## How auth works (real Chrome via CDP)

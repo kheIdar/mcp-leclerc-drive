@@ -22,6 +22,7 @@ import { loadConfig } from "./config.js";
 import { LeclercClient } from "./leclerc/client.js";
 import { FoundStore, StoreLocator } from "./leclerc/locator.js";
 import { StoreState } from "./store.js";
+import { rankProducts } from "./ranking.js";
 import { Cart, Product } from "./types.js";
 
 // Single source of truth for the version: read it from package.json (one dir up
@@ -55,6 +56,9 @@ function formatProduct(p: Product): string {
     p.label,
     p.brand ? `(${p.brand})` : null,
     `— ${p.price.toFixed(2)} €`,
+    p.promoPrice && p.regularPrice
+      ? `(promo, au lieu de ${p.regularPrice.toFixed(2)} €)`
+      : null,
     p.pricePerUnit ? `[${p.pricePerUnit}]` : null,
     p.nutriScore ? `Nutri-Score ${p.nutriScore}` : null,
     p.available ? null : "⚠️ indisponible",
@@ -97,6 +101,82 @@ server.tool(
       const products = await client.searchProducts(query);
       if (products.length === 0) return asText(`Aucun produit trouvé pour « ${query} ».`);
       return asText(products.map(formatProduct).join("\n"));
+    } catch (err) {
+      return asError(err);
+    }
+  },
+);
+
+server.tool(
+  "search_best_product",
+  "Recherche plusieurs références puis les classe au lieu de prendre le premier résultat. " +
+    "Compare la pertinence, le prix total, le prix au kg/L, les promotions, le format " +
+    "et éventuellement une quantité cible et des marques préférées. Retourne le meilleur " +
+    "choix et des alternatives ; utiliser ensuite add_to_cart avec l'id retenu.",
+  {
+    query: z.string().describe("Produit recherché, ex. 'jambon blanc sans couenne'"),
+    needed_amount: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Quantité totale souhaitée, à associer à needed_unit"),
+    needed_unit: z
+      .enum(["g", "kg", "ml", "l", "unit"])
+      .optional()
+      .describe("Unité de la quantité souhaitée"),
+    strategy: z
+      .enum(["balanced", "cheapest", "unit_price"])
+      .default("balanced")
+      .describe(
+        "balanced = meilleur compromis coût/format ; cheapest = ticket minimum ; " +
+          "unit_price = priorité au prix au kg/L",
+      ),
+    preferred_brands: z
+      .array(z.string())
+      .optional()
+      .describe("Marques à favoriser légèrement, sans ignorer un gros écart de prix"),
+    limit: z.number().int().min(1).max(10).default(5).describe("Nombre d'options classées"),
+  },
+  async ({
+    query,
+    needed_amount,
+    needed_unit,
+    strategy,
+    preferred_brands,
+    limit,
+  }) => {
+    try {
+      if ((needed_amount === undefined) !== (needed_unit === undefined)) {
+        return asError(
+          new Error("needed_amount et needed_unit doivent être fournis ensemble."),
+        );
+      }
+
+      const products = await client.searchProducts(query);
+      const ranked = rankProducts(products, {
+        query,
+        strategy,
+        neededAmount: needed_amount,
+        neededUnit: needed_unit,
+        preferredBrands: preferred_brands,
+        limit,
+      });
+
+      if (ranked.length === 0) {
+        return asText(`Aucun produit disponible et suffisamment pertinent pour « ${query} ».`);
+      }
+
+      const lines = ranked.map((entry, index) => {
+        const prefix = index === 0 ? "★ MEILLEUR CHOIX" : `${index + 1}.`;
+        const why = entry.reasons.length > 0 ? ` | ${entry.reasons.join(", ")}` : "";
+        return `${prefix} ${formatProduct(entry.product)}${why}`;
+      });
+
+      return asText(
+        `Sélection intelligente pour « ${query} » (stratégie: ${strategy}) :\n` +
+          lines.join("\n") +
+          `\n\nLe premier résultat est le choix recommandé, pas nécessairement le premier résultat Leclerc.`,
+      );
     } catch (err) {
       return asError(err);
     }
